@@ -13,6 +13,7 @@ from .add_target_dataset import AddTargetDataset
 from .append_token_dataset import AppendTokenDataset
 from .audio.raw_audio_dataset import FileAudioDataset
 from .audio.speech_commands_dataset import SpeechCommandsDataset
+from .ECG.ECG_dataset import ECGDataset
 from .backtranslation_dataset import BacktranslationDataset
 from .bucket_pad_length_dataset import BucketPadLengthDataset
 from .colorize_dataset import ColorizeDataset
