@@ -268,18 +268,15 @@ class ECGDataset(FairseqDataset):
         targets = [s["target"] for s in samples]
         #print("Targets:", targets)
         sizes = [len(s) for s in sources]
+        def multilabel_binary(classes, n_classes=len(ECGDataset.ALL_CLASSES)): # TODO: do this during preprocessing
+            class_ids = list(map(ECGDataset.label_ids.get, classes))
+            label = np.zeros(n_classes)
+            label[class_ids] = 1
+            #return np.expand_dims(label, -1)
+            return label
         
-        processed_targets = []
-        for target in targets:
-            if len(target) == 0:
-                processed_targets.append(NORM)
-            else:
-                sorted_target = sorted(target, key=ECGDataset.priorities.get)
-                processed_targets.append(sorted_target[0])
-        targets = processed_targets
-        #print("targets2:", targets)
-        targets = list(map(ECGDataset.label_ids.get, targets))
-        targets = [[t] for t in targets]
+        targets = list(map(multilabel_binary, targets))
+        print(targets)
         
         #print("targets3:", targets)
         def _collate(batch, resolution=1):
