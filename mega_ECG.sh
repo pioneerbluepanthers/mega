@@ -1,6 +1,7 @@
+run_name="initial_run"
 seed=42
 DATA=/notebooks/data/physionet.org/files/ptb-xl/1.0.3/records100Processed
-SAVE=/notebooks/checkpoints/mega/ecg/records100
+SAVE=/notebooks/checkpoints/mega/ecg/records100/$run_name
 CHUNK=1000
 
 mkdir -p ${SAVE}
@@ -18,5 +19,6 @@ python -u train.py ${DATA} \
     --lr-scheduler linear_decay --total-num-update 62500 --end-learning-rate 0.0 \
     --warmup-updates 2500 --warmup-init-lr '1e-07' --keep-last-epochs 1 --required-batch-size-multiple 1 \
     --save-dir ${SAVE} --log-format simple --log-interval 100 --num-workers 0 \
-    --sentence-class-num 5 --max-positions 1000 
+    --sentence-class-num 5 --max-positions 1000 --encoder-embed-dim 12 --wandb-project "ECG softmax" \
+    #--wandb-id $run_name
     

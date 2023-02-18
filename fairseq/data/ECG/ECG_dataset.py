@@ -28,6 +28,11 @@ from .. import FairseqDataset, BaseWrapperDataset
 
 logger = logging.getLogger(__name__)
 
+NORM = "NORM"
+MI = "MI"
+STTC = "STTC"
+HYP = "HYP"
+CD = "CD"
 
 def pad(channel, maxlen):
     channel = torch.tensor(channel)
@@ -49,6 +54,7 @@ def save_data(dir, **tensors):
 
 def load_data(dir):
     tensors = {}
+    
     for filename in os.listdir(dir):
         if filename.endswith(".pt"):
             tensor_name = filename.split(".")[0]
@@ -57,6 +63,9 @@ def load_data(dir):
         elif filename.endswith(".npy"):
             tensor_name = filename.split(".")[0]
             tensor_value = np.load(str(dir / filename), allow_pickle=True)
+            if "X" in tensor_name:
+                #print("Tensor_value shape:",  tensor_value.shape)
+                tensor_value = tensor_value.transpose((0,2,1)).astype(np.float32)
             tensors[tensor_name] = tensor_value
             
     return tensors
@@ -169,6 +178,9 @@ class ECGDataset(FairseqDataset):
         "CD",
         "HYP",
     ]
+    label_ids = {"NORM":0, "MI":1, "STTC":2, "CD":3, "HYP":4}
+    priorities = {"NORM":4, "MI":0, "STTC":2, "CD":1, "HYP":3}
+    
 
     def __init__(
             self,
@@ -205,6 +217,8 @@ class ECGDataset(FairseqDataset):
         # import pdb; pdb.set_trace()
 
         X, y = self.load_data(data_loc, partition) # (batch, length, 1)
+        
+        
         if self.gen: 
             y = y.transpose(1, 2)
             
@@ -252,8 +266,22 @@ class ECGDataset(FairseqDataset):
 
         sources = [s["source"] for s in samples]
         targets = [s["target"] for s in samples]
+        #print("Targets:", targets)
         sizes = [len(s) for s in sources]
-
+        
+        processed_targets = []
+        for target in targets:
+            if len(target) == 0:
+                processed_targets.append(NORM)
+            else:
+                sorted_target = sorted(target, key=ECGDataset.priorities.get)
+                processed_targets.append(sorted_target[0])
+        targets = processed_targets
+        #print("targets2:", targets)
+        targets = list(map(ECGDataset.label_ids.get, targets))
+        targets = [[t] for t in targets]
+        
+        #print("targets3:", targets)
         def _collate(batch, resolution=1):
             # From https://github.com/pytorch/pytorch/blob/master/torch/utils/data/_utils/collate.py
             elem = batch[0]
@@ -270,11 +298,11 @@ class ECGDataset(FairseqDataset):
                     x = x[:, ::resolution] # assume length is first axis after batch
                 return x
             else:
-                print("batch:", batch)
+                #print("batch:", batch)
                 batch = torch.tensor(batch)
                 if resolution is not None:
                     batch = batch[:, ::resolution] # assume length is first axis after batch
-                print(batch.shape)    
+                #print(batch.shape)    
                 return batch
 
         src_lengths = torch.LongTensor(sizes)

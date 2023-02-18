@@ -163,16 +163,23 @@ class MegaECGRawEncoder(nn.Module):
             src_lengths: torch.Tensor,
             last_state_only: bool = False,
     ) -> Tuple[Union[torch.Tensor, List[torch.Tensor]], torch.Tensor]:
-
-        bsz, seq_len = tokens.size()
+        #print("tokens:", tokens)
+        #print("tokens_size:", tokens.size())
+        bsz, seq_len, embedding_dim = tokens.size()
+        
         assert self.chunk_size <= 0 or seq_len % self.chunk_size == 0, 'sequence length {} must be divided by chunk size {}'.format(seq_len, self.chunk_size)
 
         padding_mask = None
         # B x T -> B x T x D
+        
+        """
         x = self.embed_tokens(tokens)
         x = self.embedding_dropout(x)
-
+        """
+        
+        
         # B x T x C -> T x B x C
+        x = tokens
         x = x.transpose(0, 1)
 
         inner_states = []
