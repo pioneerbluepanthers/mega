@@ -71,7 +71,10 @@ class BaseFairseqModel(nn.Module):
             else:
                 return F.softmax(logits, dim=-1)
         raise NotImplementedError
-
+        
+    def get_multilabel_probs_scriptable(self, net_output: Tuple[Tensor, Optional[Dict[str, List[Optional[Tensor]]]]]):
+        return F.logsigmoid(logits, dim=-1)
+    
     def extract_features(self, *args, **kwargs):
         """Similar to *forward* but only return features."""
         return self(*args, **kwargs)

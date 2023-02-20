@@ -276,7 +276,8 @@ class ECGDataset(FairseqDataset):
             return label
         
         targets = list(map(multilabel_binary, targets))
-        print(targets)
+        targets = np.vstack(targets)
+        #print(targets)
         
         #print("targets3:", targets)
         def _collate(batch, resolution=1):
@@ -296,9 +297,9 @@ class ECGDataset(FairseqDataset):
                 return x
             else:
                 #print("batch:", batch)
-                batch = np.vstack(batch)
-                print("Batch:", batch.shape)
+                #batch = np.vstack(batch)
                 batch = torch.tensor(batch)
+                #print("Batch:", batch.shape)
                 if resolution is not None:
                     batch = batch[:, ::resolution] # assume length is first axis after batch
                 #print(batch.shape)    

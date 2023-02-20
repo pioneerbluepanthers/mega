@@ -12,12 +12,13 @@ from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 
 
-@register_criterion('lra_cross_entropy')
-class LRACrossEntropyCriterion(FairseqCriterion):
+@register_criterion('lra_multilabel_bce')
+class LRAMultilabelBCECriterion(FairseqCriterion):
 
     def __init__(self, task, sentence_avg):
         super().__init__(task)
         self.sentence_avg = sentence_avg
+        self.log_threshold = torch.log(torch.tensor(0.5))
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -40,15 +41,13 @@ class LRACrossEntropyCriterion(FairseqCriterion):
         return loss, sample_size, logging_output
 
     def compute_loss(self, model, net_output, sample, reduce=True):
-        #print("Sample:", sample)
-        lprobs = model.get_normalized_probs(net_output, log_probs=True)
-        lprobs = lprobs.view(-1, lprobs.size(-1))
-        #print("lprobs:", lprobs.shape)
-        targets = model.get_targets(sample, net_output).view(-1)
-        #print("targets:", targets.shape)
-        loss = F.nll_loss(lprobs, targets, reduction='sum')
-        preds = torch.argmax(lprobs, 1)
-        correct = (preds == targets).sum()
+        print("multilabel_bce")
+        lprobs = model.get_multilabel_probs(net_output)
+        #lprobs = lprobs.view(-1, lprobs.size(-1))
+        targets = sample["target"]
+        loss = F.binary_cross_entropy_with_logits(lprobs, targets, reduction='sum')
+        preds = lprobs >= self.threshold
+        correct = (preds == targets).sum() # TODO: implement AUROCs
         return loss, correct
 
     @staticmethod

@@ -221,8 +221,11 @@ class MegaModel(FairseqEncoderDecoderModel):
                              log_probs: bool, sample: Optional[Dict[str, Tensor]] = None):
         """Get normalized probabilities (or log probs) from a net's output."""
         return self.get_normalized_probs_scriptable(net_output, log_probs, sample)
-
-
+    
+    @torch.jit.export
+    def get_multilabel_probs(self, net_output: Tuple[Tensor, Optional[Dict[str, List[Optional[Tensor]]]]]):
+        return self.get_multilabel_probs_scriptable(net_output)
+    
 class MegaEncoder(FairseqEncoder):
     """
     Mega encoder consisting of *args.encoder_layers* layers. Each layer is a :class:`MegaEncoderLayer`.
