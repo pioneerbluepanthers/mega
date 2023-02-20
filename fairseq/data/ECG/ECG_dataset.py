@@ -296,6 +296,8 @@ class ECGDataset(FairseqDataset):
                 return x
             else:
                 #print("batch:", batch)
+                batch = np.vstack(batch)
+                print("Batch:", batch.shape)
                 batch = torch.tensor(batch)
                 if resolution is not None:
                     batch = batch[:, ::resolution] # assume length is first axis after batch
