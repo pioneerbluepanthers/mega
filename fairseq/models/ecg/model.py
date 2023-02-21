@@ -4,11 +4,11 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-
+from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch import Tensor
 from fairseq import utils
 from fairseq.models import (
     FairseqEncoderModel,
@@ -138,7 +138,14 @@ class ECGRawModel(FairseqEncoderModel):
 
         encoder = ECGRawEncoder(args, task)
         return cls(args, encoder, task)
-
+    
+    def get_multilabel_probs_scriptable(self, net_output: Tuple[Tensor, Optional[Dict[str, List[Optional[Tensor]]]]]):
+        logits = net_output["encoder_out"].float()
+        return F.logsigmoid(logits)
+    
+    @torch.jit.export
+    def get_multilabel_probs(self, net_output: Tuple[Tensor, Optional[Dict[str, List[Optional[Tensor]]]]]):
+        return self.get_multilabel_probs_scriptable(net_output)    
 
 class ECGRawEncoder(FairseqEncoder):
     """LRA encoder."""
@@ -169,10 +176,12 @@ class ECGRawEncoder(FairseqEncoder):
                 max_seq_len=args.max_positions,
                 sen_rep_type=getattr(args, 'sen_rep_type', 'mp')
             )
-
+    
     def forward(self, src_tokens, src_lengths=None, **kwargs):
         return self.encoder(src_tokens, src_lengths, last_state_only=True)
+    
 
+            
 
 @register_model_architecture('ecg_raw', 'ecg_raw')
 def base_architecture(args):

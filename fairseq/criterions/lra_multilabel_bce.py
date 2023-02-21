@@ -7,7 +7,9 @@ import math
 
 import torch
 import torch.nn.functional as F
-
+from torchmetrics.classification import MultilabelAUROC
+from torchmetrics.classification import MultilabelF1Score
+from torchmetrics.classification import MultilabelAccuracy
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 
@@ -19,6 +21,13 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         super().__init__(task)
         self.sentence_avg = sentence_avg
         self.log_threshold = torch.log(torch.tensor(0.5))
+        
+        self.acc = MultilabelAccuracy(num_labels=5)
+        self.f1 = MultilabelF1Score(num_labels=5,
+        average="macro")
+        self.auroc = MultilabelAUROC(num_labels=5,
+        average="macro")
+
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -29,11 +38,10 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         3) logging outputs to display while training
         """
         net_output = model(sample)
-        loss, correct = self.compute_loss(model, net_output, sample, reduce=reduce)
+        loss = self.compute_loss(model, net_output, sample, reduce=reduce)
         sample_size = sample['target'].size(0) if self.sentence_avg else sample['ntokens']
         logging_output = {
             'loss': loss.data,
-            'ncorrects': correct.data,
             'ntokens': sample['ntokens'],
             'nsentences': sample['target'].size(0),
             'sample_size': sample_size,
@@ -41,18 +49,23 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         return loss, sample_size, logging_output
 
     def compute_loss(self, model, net_output, sample, reduce=True):
-        print("multilabel_bce")
+        #print("multilabel_bce")
         lprobs = model.get_multilabel_probs(net_output)
         #lprobs = lprobs.view(-1, lprobs.size(-1))
-        targets = sample["target"]
+        targets = sample["target"].int()
         loss = F.binary_cross_entropy_with_logits(lprobs, targets, reduction='sum')
-        preds = lprobs >= self.threshold
-        correct = (preds == targets).sum() # TODO: implement AUROCs
-        return loss, correct
+        #preds = lprobs >= self.log_threshold
+        #correct = (preds == targets).sum() # TODO: implement AUROCs
+        self.acc.update(lprobs, targets)
+        self.f1.update(lprobs, targets)
+        self.auroc.update(lprobs, targets)
+        return loss
+    
 
     @staticmethod
     def reduce_metrics(logging_outputs) -> None:
         """Aggregate logging outputs from data parallel training."""
+        print("Reduce Metrics")
         loss_sum = sum(log.get('loss', 0) for log in logging_outputs)
         ntokens = sum(log.get('ntokens', 0) for log in logging_outputs)
         nsentences = sum(log.get('nsentences', 0) for log in logging_outputs)
