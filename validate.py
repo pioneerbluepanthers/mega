@@ -10,7 +10,7 @@ import logging
 import sys
 
 import torch
-
+import json
 from fairseq import checkpoint_utils, distributed_utils, options, utils
 from fairseq.logging import metrics, progress_bar
 
@@ -25,6 +25,9 @@ logger = logging.getLogger('fairseq_cli.validate')
 
 
 def main(args, override_args=None):
+    #with open("args.json", "w") as args_f:
+        #json.dump(args, args_f, indent=2)
+    print("Args:", args.__dict__)
     utils.import_user_module(args)
 
     assert args.max_tokens is not None or args.max_sentences is not None, \
@@ -62,6 +65,12 @@ def main(args, override_args=None):
     logger.info(model_args)
 
     # Build criterion
+    """
+    criterion = task.build_criterion({**model_args.__dict__,
+                                      "save_predictions":True, 
+                                      "save_path":"/notebooks/predictions/run.npy"
+                                     })
+    """
     criterion = task.build_criterion(model_args)
     criterion.eval()
 
@@ -113,8 +122,8 @@ def main(args, override_args=None):
         with metrics.aggregate() as agg:
             task.reduce_metrics(log_outputs, criterion)
             log_output = agg.get_smoothed_values()
-
-        progress.print(log_output, tag=subset, step=i)
+        multilabel_metrics = criterion.on_epoch_end()
+        progress.print({**log_output, **multilabel_metrics}, tag=subset, step=i)
 
 
 def cli_main():

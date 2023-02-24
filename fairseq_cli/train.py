@@ -67,10 +67,11 @@ def main(args):
         if args.wandb_project and args.wandb_project != "none":
             wandb.require(experiment="service")
             resume_training = "must" if args.wandb_id is not None else None
+            
             wandb.init(project=args.wandb_project, reinit=False, name=os.environ.get(
             "WANDB_NAME", os.path.basename(args.save_dir)), entity=args.wandb_entity, resume=resume_training,
                        id=args.wandb_id)
-
+            wandb.config.update(args)
     # Print args
     logger.info(args)
 
@@ -235,7 +236,9 @@ def train(args, trainer, task, epoch_itr):
                 # the end-of-epoch stats will still be preserved
                 metrics.reset_meters("train_inner")
 
-        end_of_epoch = not itr.has_next()
+        end_of_epoch = not itr.has_next() 
+        if end_of_epoch:
+            train_multilabel_metrics = trainer.criterion.on_epoch_end()
         valid_losses, should_stop = validate_and_save(
             args, trainer, task, epoch_itr, valid_subsets, end_of_epoch
         )
@@ -245,7 +248,11 @@ def train(args, trainer, task, epoch_itr):
 
     # log end-of-epoch stats
     logger.info("end of epoch {} (average epoch stats below)".format(epoch_itr.epoch))
+    
     stats = get_training_stats(metrics.get_smoothed_values("train"))
+    stats.update(train_multilabel_metrics)
+    #print("trainer.criterion.on_epoch running")
+    #print("Stats:", stats, "Keys", stats.keys())
     progress.print(stats, tag="train", step=num_updates)
 
     # reset epoch-level meters
@@ -296,6 +303,7 @@ def validate_and_save(args, trainer, task, epoch_itr, valid_subsets, end_of_epoc
 
 def get_training_stats(stats):
     stats["wall"] = round(metrics.get_meter("default", "wall").elapsed_time, 0)
+    #print("Get_training_stats:", stats, "Keys:", stats.keys())
     return stats
 
 
@@ -336,14 +344,18 @@ def validate(args, trainer, task, epoch_itr, subsets):
 
         # create a new root metrics aggregator so validation metrics
         # don't pollute other aggregators (e.g., train meters)
+        
         with metrics.aggregate(new_root=True) as agg:
             for sample in progress:
                 trainer.valid_step(sample)
 
         # log validation stats
+        valid_multilabel_metrics = trainer.criterion.on_epoch_end()
         stats = get_valid_stats(args, trainer, agg.get_smoothed_values())
+        stats.update(valid_multilabel_metrics)
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
-
+        #print("Stats_validate_mega:", stats, "Keys:", stats.keys())
+        
         valid_losses.append(stats[args.best_checkpoint_metric])
     return valid_losses
 
@@ -416,8 +428,11 @@ def validate_mega_lm(args, trainer, task, epoch_itr, subsets):
                     trainer.mega_lm_valid_step(new_sample, incremental_states=incremental_states)
 
         # log validation stats
+        
         stats = get_valid_stats(args, trainer, agg.get_smoothed_values())
+        
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
+        
 
         valid_losses.append(stats[args.best_checkpoint_metric])
         trainer.model.analyze_ema(report=True)
@@ -432,6 +447,7 @@ def get_valid_stats(args, trainer, stats):
         stats[key] = best_function(
             checkpoint_utils.save_checkpoint.best, stats[args.best_checkpoint_metric]
         )
+    #print("Get_validation_stats:", stats, "Keys:", stats.keys())
     return stats
 
 
