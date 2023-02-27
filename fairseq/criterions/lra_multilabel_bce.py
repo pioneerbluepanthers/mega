@@ -17,13 +17,14 @@ import numpy as np
 @register_criterion('lra_multilabel_bce')
 class LRAMultilabelBCECriterion(FairseqCriterion):
 
-    def __init__(self, task, sentence_avg, save_predictions=True, save_path="/notebooks/predictions/run.npy"):
+    def __init__(self, task, sentence_avg, save_predictions=False, save_path="/notebooks/predictions/run.npy"):
         super().__init__(task)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.sentence_avg = sentence_avg
         self.log_threshold = torch.log(torch.tensor(0.5))
         
-        self.acc = MultilabelAccuracy(num_labels=5).to(self.device)
+        self.acc = MultilabelAccuracy(num_labels=5, average="macro").to(self.device)
+        
         self.f1 = MultilabelF1Score(num_labels=5,
         average="macro").to(self.device)
         self.auroc = MultilabelAUROC(num_labels=5,
@@ -31,6 +32,7 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         self.save_predictions = save_predictions
         self.save_path = save_path
         self.predictions = []
+        self.targets = []
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -59,14 +61,21 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         if self.save_predictions:
             probs_np = probs.cpu().detach().numpy()
             self.predictions.append(probs_np)
+            self.targets.append(sample["target"].cpu().detach().numpy())
         #lprobs = lprobs.view(-1, lprobs.size(-1))
+        
         targets = sample["target"]
+        #print("targets:", targets)
         loss = F.binary_cross_entropy_with_logits(lprobs, targets, reduction='sum')
         preds = lprobs >= self.log_threshold
         correct = (preds == targets).sum() # TODO: implement AUROCs
         self.acc.update(probs, targets.long())
         self.f1.update(probs, targets.long())
         self.auroc.update(probs, targets.long())
+        #print("Self_auroc_compute", self.auroc.compute())
+        #print("probs:", probs)
+        
+        #print("Targets_lra_shape:", targets.shape)
         
         return loss, correct
     
@@ -80,7 +89,11 @@ class LRAMultilabelBCECriterion(FairseqCriterion):
         self.acc.reset()
         self.f1.reset()
         self.auroc.reset()
+        
         if self.save_predictions:
+            targets = np.vstack(self.targets)
+            #print("targets_on_epoch_end:", targets.shape)
+            np.save("/notebooks/predictions/targets.npy", targets, allow_pickle=True)
             predictions = np.vstack(self.predictions)
             np.save(self.save_path, predictions, allow_pickle=True)
         return {"multi_accuracy":acc.item(), "multi_f1":f1.item(), "multi_auroc":auroc.item()}

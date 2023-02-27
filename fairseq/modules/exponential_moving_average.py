@@ -6,7 +6,7 @@
 
 import math
 from typing import Dict, Optional, Tuple
-
+import pdb
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
@@ -204,7 +204,7 @@ class MultiHeadEMA(nn.Module):
                 x = F.pad(x, (kernel_size - 1, 0))
                 fft_len = fft_len + kernel_size - 1
                 s = 2 * kernel_size - 2
-
+            #pdb.set_trace()
             k_f = torch.fft.rfft(k.float(), n=2 * fft_len)
             x_f = torch.fft.rfft(x.float(), n=2 * fft_len)
             # B x D x L
@@ -212,7 +212,7 @@ class MultiHeadEMA(nn.Module):
             out = out.type_as(x)
             # B x D x L -> L x B x D
             out = F.silu(out.permute(2, 0, 1) + residual)
-
+            
         return out
 
     def _get_input_buffer(self, incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]]) -> Dict[str, Optional[Tensor]]:

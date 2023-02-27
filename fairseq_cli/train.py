@@ -350,9 +350,9 @@ def validate(args, trainer, task, epoch_itr, subsets):
                 trainer.valid_step(sample)
 
         # log validation stats
-        valid_multilabel_metrics = trainer.criterion.on_epoch_end()
+        #valid_multilabel_metrics = trainer.criterion.on_epoch_end()
         stats = get_valid_stats(args, trainer, agg.get_smoothed_values())
-        stats.update(valid_multilabel_metrics)
+        #stats.update(valid_multilabel_metrics)
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
         #print("Stats_validate_mega:", stats, "Keys:", stats.keys())
         
@@ -441,12 +441,15 @@ def validate_mega_lm(args, trainer, task, epoch_itr, subsets):
 
 def get_valid_stats(args, trainer, stats):
     stats["num_updates"] = trainer.get_num_updates()
+    valid_multilabel_metrics = trainer.criterion.on_epoch_end()
+    stats.update(valid_multilabel_metrics)
     if hasattr(checkpoint_utils.save_checkpoint, "best"):
         key = "best_{0}".format(args.best_checkpoint_metric)
         best_function = max if args.maximize_best_checkpoint_metric else min
         stats[key] = best_function(
             checkpoint_utils.save_checkpoint.best, stats[args.best_checkpoint_metric]
         )
+        
     #print("Get_validation_stats:", stats, "Keys:", stats.keys())
     return stats
 

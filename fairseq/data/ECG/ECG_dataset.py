@@ -67,7 +67,7 @@ def load_data(dir):
                 #print("Tensor_value shape:",  tensor_value.shape)
                 tensor_value = tensor_value.transpose((0,2,1)).astype(np.float32)
             tensors[tensor_name] = tensor_value
-            
+            print("Tensor_keys:", tensors.keys())
     return tensors
 
 
@@ -129,6 +129,7 @@ def mu_law_decode(encoded, bits=8):
 
 def split_data(tensor, stratify):
     # 0.7/0.15/0.15 train/val/test split
+    print("split_data")
     (
         train_tensor,
         testval_tensor,
@@ -142,6 +143,7 @@ def split_data(tensor, stratify):
         shuffle=True,
         stratify=stratify,
     )
+    
 
     val_tensor, test_tensor = sklearn.model_selection.train_test_split(
         testval_tensor,
@@ -229,7 +231,7 @@ class ECGDataset(FairseqDataset):
             """
 
         # Subsample
-        X, y = subsample(X, y, sr)
+        #X, y = subsample(X, y, sr)
 
         # import pdb; pdb.set_trace()
         self.src = X
@@ -277,7 +279,10 @@ class ECGDataset(FairseqDataset):
         
         targets = list(map(multilabel_binary, targets))
         targets = np.vstack(targets)
-        #print(targets)
+        #index = np.arange(targets.shape[0])
+        #index = np.expand_dims(index, -1)
+        #targets = np.hstack([index, targets])
+        #print("Shape_of_targets:", targets.shape)
         
         #print("targets3:", targets)
         def _collate(batch, resolution=1):
@@ -358,6 +363,7 @@ class ECGDataset(FairseqDataset):
         elif partition == "val":
             X = tensors["val_X"]
             y = tensors["val_y"]
+            #print("Y_load_data:", y[:10])
         elif partition == "test":
             X = tensors["test_X"]
             y = tensors["test_y"]
