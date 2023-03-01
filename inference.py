@@ -36,7 +36,7 @@ if use_cuda:
 
 
 # Load ensemble
-
+args.path = "/notebooks/checkpoints/mega/ecg/records100/lr=0.01_B1=0.9_eps=1e-8_B2=0.98/checkpoint_best.pt"
 models, model_args, task = checkpoint_utils.load_model_ensemble_and_task(
     [args.path],
     suffix=getattr(args, "checkpoint_suffix", ""),
@@ -50,20 +50,23 @@ for model in models:
     if use_cuda:
         model.cuda()
 
-target = torch.load("/notebooks/examples/targets.pt")
-src_tokens = torch.load("/notebooks/examples/src_tokens.pt")
-src_lengths = torch.load("/notebooks/examples/src_lengths.pt")
-sample = {
-    "id":torch.tensor(0),
-    "nsentences":1,
-    "ntokens":1000, 
-    "net_input":{"src_tokens":src_tokens, "src_lengths":src_lengths},
-    "target":target
-}
+target = torch.load("/notebooks/examples/targets.pt", map_location="cuda:0")
+src_tokens = torch.load("/notebooks/examples/src_tokens.pt", map_location="cuda:0")
+src_lengths = torch.load("/notebooks/examples/src_lengths.pt", map_location="cuda:0")
+print("target_device:", target.device)
+
 labels = ["NORM", "MI", "STTC", "CD", "HYP"]
 @app.route("/infer")
 def infer():
+    sample = {
+        "id":torch.tensor(0, device=args.device_id),
+        "nsentences":1,
+        "ntokens":1000, 
+        "net_input":{"src_tokens":src_tokens, "src_lengths":src_lengths},
+        "target":target
+    }
     net_output = model(sample)
     lprobs = model.get_multilabel_probs(net_output)
     probs = torch.exp(lprobs).tolist()[0]
+    print("Target:", target)
     return {"probs":{condition: prob for condition, prob in zip(labels, probs)}}
