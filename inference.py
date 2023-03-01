@@ -8,136 +8,62 @@
 from itertools import chain
 import logging
 import sys
-
+import yaml
 import torch
 import json
 from fairseq import checkpoint_utils, distributed_utils, options, utils
-from fairseq.logging import metrics, progress_bar
+from flask import Flask
+
+app = Flask(__name__)
+with open("args.yaml") as args_f:
+    args = yaml.unsafe_load(args_f)
 
 
-logging.basicConfig(
-    format='%(asctime)s | %(levelname)s | %(name)s | %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.INFO,
-    stream=sys.stdout,
+#with open("args.json", "w") as args_f:
+    #json.dump(args, args_f, indent=2)
+#print("Args:", args.__dict__)
+utils.import_user_module(args)
+#print("Args_max_tokens", args.max_tokens)
+#print("Args_max_sentences", args.max_sentences)
+assert args.max_tokens is not None or args.max_sentences is not None, \
+    'Must specify batch size either with --max-tokens or --max-sentences'
+
+use_fp16 = args.fp16
+use_cuda = torch.cuda.is_available() and not args.cpu
+
+if use_cuda:
+    torch.cuda.set_device(args.device_id)
+
+
+# Load ensemble
+
+models, model_args, task = checkpoint_utils.load_model_ensemble_and_task(
+    [args.path],
+    suffix=getattr(args, "checkpoint_suffix", ""),
 )
-logger = logging.getLogger('fairseq_cli.validate')
+model = models[0]
 
-
-def main(args, override_args=None):
-    #with open("args.json", "w") as args_f:
-        #json.dump(args, args_f, indent=2)
-    print("Args:", args.__dict__)
-    utils.import_user_module(args)
-    print("Args_max_tokens", args.max_tokens)
-    print("Args_max_sentences", args.max_sentences)
-    assert args.max_tokens is not None or args.max_sentences is not None, \
-        'Must specify batch size either with --max-tokens or --max-sentences'
-
-    use_fp16 = args.fp16
-    use_cuda = torch.cuda.is_available() and not args.cpu
-
+# Move models to GPU
+for model in models:
+    if use_fp16:
+        model.half()
     if use_cuda:
-        torch.cuda.set_device(args.device_id)
+        model.cuda()
 
-    if override_args is not None:
-        overrides = vars(override_args)
-        overrides.update(eval(getattr(override_args, 'model_overrides', '{}')))
-    else:
-        overrides = None
-
-    # Load ensemble
-    logger.info('loading model(s) from {}'.format(args.path))
-    models, model_args, task = checkpoint_utils.load_model_ensemble_and_task(
-        [args.path],
-        arg_overrides=overrides,
-        suffix=getattr(args, "checkpoint_suffix", ""),
-    )
-    model = models[0]
-
-    # Move models to GPU
-    for model in models:
-        if use_fp16:
-            model.half()
-        if use_cuda:
-            model.cuda()
-
-    # Print args
-    logger.info(model_args)
-
-    # Build criterion
-    """
-    criterion = task.build_criterion({**model_args.__dict__,
-                                      "save_predictions":True, 
-                                      "save_path":"/notebooks/predictions/run.npy"
-                                     })
-    """
-    criterion = task.build_criterion(model_args)
-    criterion.eval()
-
-    for subset in args.valid_subset.split(','):
-        try:
-            task.load_dataset(subset, combine=False, epoch=1)
-            dataset = task.dataset(subset)
-        except KeyError:
-            raise Exception('Cannot find dataset: ' + subset)
-
-        # Initialize data iterator
-        itr = task.get_batch_iterator(
-            dataset=dataset,
-            max_tokens=args.max_tokens,
-            max_sentences=args.max_sentences,
-            max_positions=utils.resolve_max_positions(
-                task.max_positions(),
-                *[m.max_positions() for m in models],
-            ),
-            ignore_invalid_inputs=args.skip_invalid_size_inputs_valid_test,
-            required_batch_size_multiple=args.required_batch_size_multiple,
-            seed=args.seed,
-            num_shards=args.distributed_world_size,
-            shard_id=args.distributed_rank,
-            num_workers=args.num_workers,
-        ).next_epoch_itr(shuffle=False)
-        progress = progress_bar.progress_bar(
-            itr,
-            log_format=args.log_format,
-            log_interval=args.log_interval,
-            prefix=f"valid on '{subset}' subset",
-            default_log_format=('tqdm' if not args.no_progress_bar else 'simple'),
-        )
-
-        log_outputs = []
-        for i, sample in enumerate(progress):
-            sample = utils.move_to_cuda(sample) if use_cuda else sample
-            _loss, _sample_size, log_output = task.valid_step(sample, model, criterion)
-            progress.log(log_output, step=i)
-            log_outputs.append(log_output)
-            #break
-
-        if args.distributed_world_size > 1:
-            log_outputs = distributed_utils.all_gather_list(
-                log_outputs,
-                max_size=getattr(args, 'all_gather_list_size', 16384),
-            )
-            log_outputs = list(chain.from_iterable(log_outputs))
-
-        with metrics.aggregate() as agg:
-            task.reduce_metrics(log_outputs, criterion)
-            log_output = agg.get_smoothed_values()
-        multilabel_metrics = criterion.on_epoch_end()
-        progress.print({**log_output, **multilabel_metrics}, tag=subset, step=i)
-
-
-def cli_main():
-    parser = options.get_validation_parser()
-    args = options.parse_args_and_arch(parser)
-
-    # only override args that are explicitly given on the command line
-    override_parser = options.get_validation_parser()
-    override_args = options.parse_args_and_arch(override_parser, suppress_defaults=True)
-
-    distributed_utils.call_main(args, main, override_args=override_args)
-
-
-if __name__ == '__main__':
-    cli_main()
+target = torch.load("/notebooks/examples/targets.pt")
+src_tokens = torch.load("/notebooks/examples/src_tokens.pt")
+src_lengths = torch.load("/notebooks/examples/src_lengths.pt")
+sample = {
+    "id":torch.tensor(0),
+    "nsentences":1,
+    "ntokens":1000, 
+    "net_input":{"src_tokens":src_tokens, "src_lengths":src_lengths},
+    "target":target
+}
+labels = ["NORM", "MI", "STTC", "CD", "HYP"]
+@app.route("/infer")
+def infer():
+    net_output = model(sample)
+    lprobs = model.get_multilabel_probs(net_output)
+    probs = torch.exp(lprobs).tolist()[0]
+    return {"probs":{condition: prob for condition, prob in zip(labels, probs)}}
