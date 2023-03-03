@@ -8,7 +8,7 @@
 from itertools import chain
 import logging
 import sys
-
+sys.path.append("/notebooks/TorchLRP")
 import torch
 import json
 from fairseq import checkpoint_utils, distributed_utils, options, utils

@@ -39,16 +39,16 @@ class MegaSentenceEncoderLayer(nn.Module):
         prenorm: bool = True,
         feature_dropout: bool = False,
         export: bool = False,
+        layer_index=None, 
     ) -> None:
         super().__init__()
-
         self.embedding_dim = embedding_dim
         self.chunk_size = chunk_size
         self.mega_layer = self.build_mega_layer(embedding_dim, hidden_dim, z_dim, n_dim,
                                            dropout, attention_dropout, hidden_dropout,
                                            activation, attention_activation,
                                            chunk_size, truncation, rel_pos_bias, max_positions,
-                                           norm_type, prenorm, feature_dropout, export)
+                                           norm_type, prenorm, feature_dropout, export, layer_index)
 
         if ffn_hidden_dim is not None and ffn_hidden_dim > 0:
             self.nffn = self.build_nffn_layer(embedding_dim, ffn_hidden_dim,
@@ -61,7 +61,7 @@ class MegaSentenceEncoderLayer(nn.Module):
                          dropout, attention_dropout, hidden_dropout,
                          activation, attention_activation,
                          chunk_size, truncation, rel_pos_bias, max_positions,
-                         norm_type, prenorm, feature_dropout, export):
+                         norm_type, prenorm, feature_dropout, export, layer_index):
         return MovingAverageGatedAttention(
             embed_dim=embedding_dim,
             zdim=z_dim,
@@ -80,7 +80,8 @@ class MegaSentenceEncoderLayer(nn.Module):
             norm_type=norm_type,
             prenorm=prenorm,
             feature_dropout=feature_dropout,
-            export=export
+            export=export,
+            layer_index=layer_index
         )
 
     def build_nffn_layer(self, embedding_dim, ffn_hidden_dim,

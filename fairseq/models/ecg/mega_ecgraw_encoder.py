@@ -105,9 +105,10 @@ class MegaECGRawEncoder(nn.Module):
                 norm_type=norm_type,
                 prenorm=normalize_before,
                 feature_dropout=feature_dropout,
-                export=export
+                export=export, 
+                layer_index=layer_index
             )
-            for _ in range(self.num_layers)
+            for layer_index in range(self.num_layers)
         ])
 
         if normalize_before:
@@ -135,6 +136,7 @@ class MegaECGRawEncoder(nn.Module):
         prenorm,
         feature_dropout,
         export,
+        layer_index,
     ):
         return MegaSentenceEncoderLayer(
             embedding_dim=embedding_dim,
@@ -154,7 +156,8 @@ class MegaECGRawEncoder(nn.Module):
             norm_type=norm_type,
             prenorm=prenorm,
             feature_dropout=feature_dropout,
-            export=export
+            export=export,
+            layer_index=layer_index
         )
 
     def forward(
@@ -195,7 +198,8 @@ class MegaECGRawEncoder(nn.Module):
             x = self.final_norm(x)
 
         if self.sen_rep_type == 'mp':
-            sentence_rep = x.sum(dim=0) / src_lengths.unsqueeze(1)
+            #sentence_rep = x.sum(dim=0) / src_lengths.unsqueeze(1)
+            sentence_rep = x.sum(dim=0) / 1000
         else:
             sentence_rep = x[0, :, :]
 

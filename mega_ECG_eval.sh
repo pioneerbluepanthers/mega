@@ -11,4 +11,4 @@ cp $0 ${SAVE}/run.sh
 
 # Mega base
 
-python validate.py $DATA --task ecg --batch-size 200 --valid-subset val --path $CHECKPOINT_PATH --criterion lra_multilabel_bce 
+python validate.py $DATA --task ecg --batch-size 200 --valid-subset test --path $CHECKPOINT_PATH --criterion lra_multilabel_bce 

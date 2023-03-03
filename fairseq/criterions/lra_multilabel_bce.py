@@ -17,7 +17,7 @@ import numpy as np
 @register_criterion('lra_multilabel_bce')
 class LRAMultilabelBCECriterion(FairseqCriterion):
 
-    def __init__(self, task, sentence_avg, save_predictions=False, save_path="/notebooks/predictions/run.npy"):
+    def __init__(self, task, sentence_avg, save_predictions=True, save_path="/notebooks/predictions/y_pred_best.npy"):
         super().__init__(task)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.sentence_avg = sentence_avg

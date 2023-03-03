@@ -26,14 +26,14 @@ python -u train.py ${DATA} \
     --criterion lra_multilabel_bce --best-checkpoint-metric multi_auroc --maximize-best-checkpoint-metric \
     --optimizer adam --lr $LR --adam-betas "(${ADAMB1}, ${ADAMB2})" --adam-eps $ADAMEPS --clip-norm 1.0 \
     --dropout 0.0 --attention-dropout 0.0 --act-dropout 0.0 \
-    --weight-decay $WD \
     --batch-size 20 --sentence-avg --update-freq 1 --max-update 62500 \
     --lr-scheduler linear_decay --total-num-update 62500 --end-learning-rate 0.0 \
     --warmup-updates 2500 --warmup-init-lr '1e-07' --keep-last-epochs 1 --required-batch-size-multiple 1 \
     --save-dir ${SAVE} --log-format simple --log-interval 100 --num-workers 0 \
     --sentence-class-num 5 --max-positions 1000 --encoder-embed-dim 12 --wandb-project "ECG multilabel" --encoder-hidden-dim $EHD\
     --encoder-layers $ENCODERLAYER \
-    --encoder-ffn-embed-dim $FFNEMBED
+    --encoder-ffn-embed-dim $FFNEMBED \
+    --weight-decay $WD 
     #--wandb-id $run_name
     
     

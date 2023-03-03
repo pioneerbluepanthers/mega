@@ -6,13 +6,14 @@
 
 import math
 from typing import Dict, Optional, Tuple
-
+import sys
+sys.path.append("/notebooks/TorchLRP")
 import torch
 import pdb
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Parameter
-
+import lrp
 from fairseq import utils
 from fairseq.incremental_decoding_utils import with_incremental_state
 from fairseq.modules.fairseq_dropout import FairseqDropout, FairseqFeatureDropout
@@ -49,6 +50,7 @@ class MovingAverageGatedAttention(nn.Module):
         rel_pos_bias='simple',
         max_positions=1024,
         export=False,
+        layer_index=None,
     ):
         super().__init__()
 
@@ -71,8 +73,11 @@ class MovingAverageGatedAttention(nn.Module):
         self.norm = SequenceNorm(norm_type, embed_dim, affine=norm_affine, export=export)
 
         self.move = MultiHeadEMA(embed_dim, ndim=ndim, bidirectional=bidirectional, truncation=truncation)
-
-        self.v_proj = nn.Linear(embed_dim, hdim)
+        print("Layer_index:", layer_index)
+        if layer_index == 0:
+            self.v_proj = lrp.Linear(embed_dim, hdim)
+        else:
+            self.v_proj = nn.Linear(embed_dim, hdim)
         self.mx_proj = nn.Linear(embed_dim, zdim + hdim + 2 * embed_dim)
         self.h_proj = nn.Linear(hdim, embed_dim)
 

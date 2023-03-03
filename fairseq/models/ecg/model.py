@@ -16,6 +16,9 @@ from fairseq.models import (
     register_model,
     register_model_architecture,
 )
+import sys
+sys.path.append("/notebooks/TorchLRP")
+import lrp
 from fairseq.modules import (
     FairseqDropout,
 )
@@ -38,16 +41,16 @@ class ECGRawModel(FairseqEncoderModel):
     """
     def __init__(self, args, encoder, task):
         super().__init__(encoder)
-        self.encoder = encoder
+        self.encoder = lrp.Sequential(encoder)
         self.args = args
         self._max_positions = args.max_positions
         self.sentence_out_dim = args.sentence_class_num
         self.dropout_module = FairseqDropout(args.dropout, module_name=self.__class__.__name__)
         self.classifier = nn.ModuleList([])
-        self.classifier.append(nn.Sequential(Linear(args.classifier_in_dim, args.classifier_out_dim),
+        self.classifier.append(lrp.Sequential(Linear(args.classifier_in_dim, args.classifier_out_dim),
                                              self.dropout_module))
         self.classifier.extend([
-            nn.Sequential(Linear(args.classifier_out_dim, args.classifier_out_dim), self.dropout_module)
+            lrp.Sequential(Linear(args.classifier_out_dim, args.classifier_out_dim), self.dropout_module)
             for _ in range(args.classifier_layers - 1)
         ])
         # self.classifier = nn.Linear(args.classifier_in_dim, args.classifier_out_dim)
@@ -110,7 +113,7 @@ class ECGRawModel(FairseqEncoderModel):
         parser.add_argument('--chunk-size', type=int, metavar='N',help='chunk size of Mega.')
         parser.add_argument('--truncation-length', type=int, metavar='N', help='truncation length of moving average layer.')
 
-    def forward(self, sample):
+    def forward(self, sample, explain=False, rule=None, pattern=None):
         src_tokens = sample['net_input']['src_tokens']
         src_lengths = sample['net_input']['src_lengths']
         sentence_rep = self.encoder(src_tokens, src_lengths)
